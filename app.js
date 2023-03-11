@@ -26,8 +26,10 @@ app.use(bodyParser.json());
 
 
 app.use(cookieParser())
-// ROUTES
+// ROUTES IMPORTS
 const authRoutes = require('./routes/auth');
+const friendRoutes = require('./routes/friend');
+
 
 app.post('/', (req, res) => {
   console.log(req.body)
@@ -36,13 +38,8 @@ app.post('/', (req, res) => {
 });
 
 
-
-app.get('/protected-route', authMiddleware, (req, res) => {
-
-
-  res.send('This route is protected');
-});
-
+// define routes
+app.use('/friend',authMiddleware, friendRoutes);
 
 app.use('/', authRoutes);
 
