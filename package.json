@@ -9,7 +9,8 @@
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.1",
     "nodeman": "^1.1.2",
-    "nodemon": "^2.0.21"
+    "nodemon": "^2.0.21",
+    "uuid": "^9.0.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

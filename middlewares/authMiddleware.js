@@ -1,11 +1,12 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/user');
+const User = require('../models/userModel');
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.headers.authorization.split(' ')[1];
+    const token = req.cookies.token
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findOne({ _id: decodedToken.userId, 'tokens.token': token });
+    const _id = decodedToken.userId
+    const user = await User.findOne({_id, token});
 
     if (!user) {
       throw new Error();
@@ -13,6 +14,8 @@ const authMiddleware = async (req, res, next) => {
 
     req.token = token;
     req.user = user;
+    console.log("AUTH BRO!!!")
+
     next();
   } catch (error) {
     res.status(401).send({ error: 'Authentication failed' });
