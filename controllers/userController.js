@@ -1,67 +1,76 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const User = require('../models/userModel');
+const User = require("../models/userModel");
+var sizeOf = require("buffer-image-size");
 
-const register = async (req, res, next) => {
+const updateProfile = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const user = await User.findById(req.user._id);
 
-    // Generate a random 4-digit tag
-    let tag;
-    let isTagUnique = false;
-    while (!isTagUnique) {
-      tag = Math.floor(1000 + Math.random() * 9000).toString();
-      const existingUser = await User.findOne({ username, tag });
-      if (!existingUser) {
-        isTagUnique = true;
-      }
+    if (!user) {
+      return res.status(404).send("User not found");
     }
 
-    // Hash the password and create a new user
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({
-      username,
-      tag,
-      email,
-      password: hashedPassword,
-      active: false,
-      blocked: false,
-      friends: [],
-      messageLists: [],
-    });
+    // SET PROFILE PICTURE
+    try{
+      if (req.file.buffer) {
+        const buffer = req.file.buffer;
+        var dimensions = sizeOf(buffer);
+        if (
+          dimensions.height == 256 &&
+          dimensions.width == 256 &&
+          dimensions.type == "jpg"
+        ) {
+          user.profilePicture = req.file.buffer;
+        }
+      }
 
-    // Generate a token and save the user
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET);
-    user.token = token;
+    } catch{
+      // no profile picture that's alright
+    }
+
+
+    if (req.body.username) {
+      user.username = req.body.username;
+    }
+
+    if (req.body.tag) {
+      user.tag = req.body.tag;
+    }
+
     await user.save();
 
-    res.status(201).json({ message: 'User registered successfully!' });
+    return res.status(200).send(user);
   } catch (err) {
-    next(err);
+    console.log(err);
+    return res.status(500).send("Server error");
   }
 };
 
-const login = async (req, res, next) => {
+const getLoggedInUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid email or password' });
-    }
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Invalid email or password' });
-    }
-    const token = user.token;
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'none',
-    });
-    res.json({ message: 'Logged in successfully!' });
-  } catch (err) {
-    next(err);
+    const user = await User.findById(req.user._id);
+    res.status(200).json(user);
+  } catch (error) {
+    res.status(500).json({ error: "Unable to retrieve user" });
   }
 };
 
-module.exports = { register, login };
+const getProfilePicture = async (req, res) => {
+  try {
+    console.log(req.params.id);
+
+    const user = await User.findById(req.params.id).select("+profilePicture ");
+    if (!user || !user.profilePicture) {
+      return res.status(404).send("Profile picture not found");
+    }
+    res.set("Content-Type", "image/jpeg");
+    res.send(user.profilePicture);
+  } catch (error) {
+    res.status(500).send("Unable to retrieve profile picture");
+  }
+};
+
+module.exports = {
+  getLoggedInUser,
+  updateProfile,
+  getProfilePicture,
+};
