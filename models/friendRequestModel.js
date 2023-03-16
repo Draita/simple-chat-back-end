@@ -7,7 +7,7 @@ const friendshipRequestSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: async function(v) {
-        const doc = await this.constructor.findOne({ requester: v, addressee: this.addressee });
+        const doc = await this.constructor.findOne({ requester: v, addressee: this.addressee, status: { $ne: "cancelled" } });
         return !doc;
       },
       message: 'The requester and addressee must be different.'
@@ -19,13 +19,23 @@ const friendshipRequestSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: async function(v) {
-        const doc = await this.constructor.findOne({ requester: this.requester, addressee: v });
+        const doc = await this.constructor.findOne({ requester: this.requester, addressee: v, status: { $ne: "cancelled" } });
         return !doc;
       },
       message: 'The requester and addressee must be different.'
     }
   },
-  status: { type: String, required: true, default: 'pending' },
+  status: {
+    type: String,
+    required: true,
+    enum: ['pending', 'accepted', 'cancelled'],
+    validate: {
+      validator: function(v) {
+        return v !== 'accepted';
+      },
+      message: 'Cannot send a new friend request when an existing one is accepted.'
+    }
+  },
 });
 
 module.exports = mongoose.model('FriendshipRequest', friendshipRequestSchema);
