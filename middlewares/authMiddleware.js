@@ -7,19 +7,13 @@ const authMiddleware = async (req, res, next) => {
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
     const _id = decodedToken.userId;
     const user = await User.findOne({ token });
-    console.log("correctToken: ", decodedToken );
 
     if (!user) {
-      console.log("--------------------");
-
-      console.log("wrongToken: ", decodedToken );
-
       throw new Error();
     }
 
     req.token = token;
     req.user = user;
-    console.log("AUTH BRO!!!");
 
     next();
   } catch (error) {
@@ -41,10 +35,8 @@ const socketAuthMiddleware = async (socket, next) => {
     }
 
     socket.user = user;
-    console.log("Socket authenticated");
     next();
   } catch (error) {
-    console.log("Socket authentication failed");
     socket.disconnect();
   }
 };
