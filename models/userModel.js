@@ -67,6 +67,15 @@ const userSchema = new mongoose.Schema({
     unique: true,
     select:false
   },
+  isOnline:{
+    default: false,
+    required: false,
+    type: Boolean,
+  },
+  connectedSockets: {
+    type: [String], // array of socket IDs
+    default: [],
+  },
 });
 
 userSchema.index({ username: 1, tag: 1 }, { unique: true });
