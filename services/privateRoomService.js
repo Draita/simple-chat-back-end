@@ -30,11 +30,10 @@ async function createPrivateRoom(user1Id, user2Id) {
 
 
 
-async function setRoomName(room, userId) {
+async function setRoomNameAndId(room, userId) {
   const roomId = room._id;
   const type = room.type;
-
-
+  const user = {};
 
   // If the room is private, find the other participant and update the room name
   if (type === "private") {
@@ -42,19 +41,22 @@ async function setRoomName(room, userId) {
       .populate("room")
       .populate("user", "username");
 
-
-
     const otherParticipant = participantsRoom.find(
       (p) => !p.user._id.equals(userId)
     );
     if (otherParticipant) {
-      room.name = otherParticipant.user.username;
+      user.username = otherParticipant.user.username;
+      user._id = otherParticipant.user._id
     }
   }
-  return room
+
+  room.user = user;
+
+
+  return room;
 }
 
 module.exports = {
   createPrivateRoom,
-  setRoomName,
+  setRoomNameAndId,
 };
