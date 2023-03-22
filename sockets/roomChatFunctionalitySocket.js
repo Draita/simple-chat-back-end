@@ -6,9 +6,8 @@ const {
   saveMessage
 } = require("../controllers/roomController");
 
-module.exports = (io) => {
-  io.on("connection", async (socket) => {
-    console.log(`User connected: ${socket.user._id}`);
+module.exports = (io,socket) => {
+
 
     socket.on("join room", async (roomId) => {
       await joinRoom(io, socket, roomId);
@@ -32,5 +31,5 @@ module.exports = (io) => {
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.user._id}`);
     });
-  });
+
 };
