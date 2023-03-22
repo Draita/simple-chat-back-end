@@ -2,57 +2,60 @@ const FriendRequest = require("../models/friendRequestModel");
 const User = require("../models/userModel");
 const Friendship = require("../models/FriendshipModel");
 const { createPrivateRoom } = require('../services/privateRoomService');
+const { emitToUsers } = require('../services/socketUtils');
 
 
 
-
-
-async function sendFriendRequest(req, res, next) {
+async function sendFriendRequest(socket, usernameAndTag,io ) {
   try {
-    console.log("bro")
-    const requesterId = req.user._id;
-    const { usernameAndTag } = req.body;
-    const [username, tag] = usernameAndTag.split("#");
 
+    const [username, tag] = usernameAndTag.split("#");
     if (!username || !tag) {
-      return res.status(400).json({ error: "Invalid username and tag." });
+      return socket.emit("friendRequestError", { error: "Invalid username and tag." });
     }
 
     const addressee = await User.findOne({ username, tag });
     if (!addressee) {
-      return res.status(404).json({ error: "Addressee not found." });
+      return socket.emit("friendRequestError", { error: "Addressee not found." });
     }
 
 
-    const request = await FriendRequest.create({
-      requester: requesterId,
+
+    const friendRequest = await FriendRequest.create({
+      requester: socket.user._id,
       addressee: addressee._id,
       status: "pending"
     });
 
-    const populatedRequest = await FriendRequest.findById(request._id)
-      .populate("requester", "username tag")
-      .populate("addressee", "username tag");
+    console.log("adreesseee: "+ friendRequest.addressee)
+    console.log("requester: "+socket.user._id )
 
-    return res.status(201).json(populatedRequest);
+    const populatedRequest = await FriendRequest.findOne({ requester: socket.user._id, addressee: friendRequest.addressee,
+      status: 'pending' })
+  .populate("requester", "username tag")
+  .populate("addressee", "username tag");
+
+      const userIDs = [socket.user._id,  addressee._id];
+
+      emitToUsers(io,userIDs, "new friend", populatedRequest)
+    // socket.emit("friendRequestSent", populatedRequest);
   } catch (error) {
-    return next(error);
+    console.log(error)
+    socket.emit("friendRequestError", { error: error.message });
   }
 }
 
-async function acceptFriendRequest(req, res, next) {
+async function acceptFriendRequest(socket, _id,io) {
   try {
-    const { requester } = req.body;
-    const addressee = req.user._id;
-
+    const addressee = socket.user._id;
     const request = await FriendRequest.findOneAndUpdate(
-      { requester, addressee, status: "pending" },
+      { _id, addressee, status: "pending" },
       { status: "accepted" },
       { new: true }
     );
 
     if (!request) {
-      return res.status(404).json({ error: "Friend request not found." });
+      return socket.emit("friendRequestError", { error: "Friend request not found." });
     }
 
     const user1 = request.requester;
@@ -61,85 +64,106 @@ async function acceptFriendRequest(req, res, next) {
     const newRoom = await createPrivateRoom(user1, user2);
 
     const friendship = await Friendship.create({ user1, user2, room: newRoom._id });
+    console.log("accepted")
 
-    return res
-      .status(200)
-      .json({ message: "Friend request accepted successfully.", friendship });
+
+    const userIDs = [request.addressee, request.requester]
+    emitToUsers(io,userIDs, "remove request", request._id)
+
+
   } catch (error) {
-    return next(error);
+    socket.emit("friendRequestError", { error: error.message });
   }
 }
 
-async function cancelFriendRequest(req, res, next) {
-  try {
-    const { addressee } = req.body;
-    const requester = req.user._id;
 
+async function refuseFriendRequest(socket,_id ,io){
+  try{
+// TODO: fix this
+    const addressee = socket.user._id;
     const request = await FriendRequest.findOneAndUpdate(
-      { requester, addressee, status: "pending" },
-      { status: "cancelled" },
+      { _id, addressee, status: "pending" },
+      { status: "refused" },
       { new: true }
     );
 
+    const userIDs = [request.addressee, request.requester]
+
+    emitToUsers(io,userIDs, "remove request", request._id)
+
+  } catch(error){
+    console.log(error)
+  }
+}
+
+
+async function removeFriendReqeust(socket,_id ,io, newStatus ) {
+  try {
+    const requester = socket.user._id;
+    console.log("ID: "+_id)
+    console.log("requester: "+requester)
+
+
+    const request = await FriendRequest.findOneAndUpdate(
+      { _id, requester, status: "pending" },
+      { status: newStatus },
+      { new: true }
+    );
+    console.log(request)
+
+
     if (!request) {
-      return res.status(404).json({ error: "Friend request not found." });
+      return socket.emit("friendRequestError", { error: "Friend request not found." });
     }
 
-    return res.status(200).json({ message: "Friend request cancelled." });
+    const userIDs = [request.addressee, request.requester]
+    console.log(userIDs)
+
+    emitToUsers(io,userIDs, "remove request", request._id)
   } catch (error) {
-    return next(error);
+    console.log(error)
+    socket.emit("friendRequestError", { error: error.message });
   }
 }
 
-async function blockFriend(req, res, next) {
+async function blockFriend(socket, { userId, friendId }) {
   try {
-    const { userId, friendId } = req.body;
     await User.findByIdAndUpdate(userId, { $pull: { friends: friendId } });
     await User.findByIdAndUpdate(friendId, { $pull: { friends: userId } });
-    return res.status(200).json({ message: "Friend blocked." });
+    socket.emit("friendBlocked", { message: "Friend blocked." });
   } catch (error) {
-    return next(error);
+    socket.emit("friendRequestError", { error: error.message });
   }
 }
 
-async function getPendingFriendRequests(req, res, next) {
+async function getPendingFriendRequests(socket) {
   try {
     // Find all incoming friend requests for the current user
     const incomingRequests = await FriendRequest.find({
-      addressee: req.user._id,
+      addressee: socket.user._id,
       status: "pending",
     }).populate("requester", "username");
 
-    // Map the incoming requests to include a flag for whether they are incoming or outgoing
-    const updatedIncomingRequests = incomingRequests.map((request) => ({
-      ...request.toObject(),
-      isIncoming: true,
-    }));
-
     // Find all outgoing friend requests initiated by the current user
-    const outgoingRequests = await FriendRequest.find({
-      requester: req.user._id,
+    outgoingRequests = await FriendRequest.find({
+      requester: socket.user._id,
       status: "pending",
     }).populate("addressee", "username");
 
-    // Map the outgoing requests to include a flag for whether they are incoming or outgoing
-    const updatedOutgoingRequests = outgoingRequests.map((request) => ({
-      ...request.toObject(),
-      isIncoming: false,
-    }));
 
-    // Combine the incoming and outgoing requests into a single array and send it as the response
-    res
-      .status(200)
-      .json([...updatedIncomingRequests, ...updatedOutgoingRequests]);
+
+    // Combine the incoming and outgoing requests into a single array and emit it to the client
+    socket.emit("pending friend requests", [...incomingRequests, ...outgoingRequests]);
   } catch (error) {
-    return next(error);
+    console.error(error);
   }
 }
+
 module.exports = {
   sendFriendRequest,
   acceptFriendRequest,
   blockFriend,
   getPendingFriendRequests,
-  cancelFriendRequest,
+  removeFriendReqeust,
+  refuseFriendRequest
 };
