@@ -4,11 +4,17 @@ const Room = require("../models/roomModel");
 
 
 async function createPrivateRoom(user1Id, user2Id) {
-  // Check if users already share a private room
-  const existingRoom = await Room.findOne({
-    type: "private",
-    "participants.user": { $all: [user1Id, user2Id] },
-  });
+  const existingParticipants = await Participant.find({
+    user: { $in: [user1Id, user2Id] },
+    room: { $exists: true, $ne: null },
+  }).populate("room");
+
+  if (existingParticipants) {
+    console.log(existingParticipants)
+    console.log("Users already share a private room");
+    return "already exists";
+  }
+
 
   if (existingRoom) {
     console.log("Users already share a private room");
@@ -27,7 +33,6 @@ async function createPrivateRoom(user1Id, user2Id) {
   console.log("Private room created");
   return room;
 }
-
 
 
 async function setRoomNameAndId(room, userId) {
