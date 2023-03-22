@@ -7,7 +7,7 @@ const friendshipRequestSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: async function(v) {
-        const doc = await this.constructor.findOne({ requester: v, addressee: this.addressee, status: { $ne: "cancelled" } });
+        const doc = await this.constructor.findOne({ requester: v, addressee: this.addressee, status: { $nin: ["cancelled", "refused"] } });
         return !doc;
       },
       message: 'The requester and addressee must be different.'
@@ -19,7 +19,7 @@ const friendshipRequestSchema = new mongoose.Schema({
     required: true,
     validate: {
       validator: async function(v) {
-        const doc = await this.constructor.findOne({ requester: this.requester, addressee: v, status: { $ne: "cancelled" } });
+        const doc = await this.constructor.findOne({ requester: this.requester, addressee: v, status: { $nin: ["cancelled", "refused"] } });
         return !doc;
       },
       message: 'The requester and addressee must be different.'
@@ -28,7 +28,7 @@ const friendshipRequestSchema = new mongoose.Schema({
   status: {
     type: String,
     required: true,
-    enum: ['pending', 'accepted', 'cancelled'],
+    enum: ['pending', 'accepted', 'cancelled', 'refused'],
     validate: {
       validator: function(v) {
         return v !== 'accepted';
