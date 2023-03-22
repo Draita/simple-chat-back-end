@@ -17,13 +17,13 @@ const {getPendingFriendRequests,
 // router.get("/block/:userId", function (req, res) {
 //   friendController.blockFriend;
 // });
-router.put('/cancel', cancelFriendRequest);
-router.put('/accept', acceptFriendRequest);
+// router.put('/cancel', cancelFriendRequest);
+// router.put('/accept', acceptFriendRequest);
 
 
-router.post('/add', sendFriendRequest);
+// router.post('/add', sendFriendRequest);
 
-router.get('/requests', getPendingFriendRequests);
+// router.get('/requests', getPendingFriendRequests);
 
 
 module.exports = router;
